@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,12 @@ public abstract class Validator implements Interceptor {
 	protected static final String DEFAULT_DATE_PATTERN = "yyyy-MM-dd";
 	protected static final String emailAddressPattern = "\\b(^['_A-Za-z0-9-]+(\\.['_A-Za-z0-9-]+)*@([A-Za-z0-9-])+(\\.[A-Za-z0-9-]+)*((\\.[A-Za-z0-9]{2,})|(\\.[A-Za-z0-9]{2,}\\.[A-Za-z0-9]{2,}))$)\\b";
 	
+	/**
+	 * 设置短路验证. 默认值为 false
+	 * 短路验证是指在验证过程中，只要碰到验证失败则立即停止后续验证并返回
+	 * 非短路验证是指验证操作一直持续到结束，无论中途有没有碰到验证失败
+	 * @param shortCircuit true 表示短路型验证
+	 */
 	protected void setShortCircuit(boolean shortCircuit) {
 		this.shortCircuit = shortCircuit;
 	}
@@ -60,6 +66,11 @@ public abstract class Validator implements Interceptor {
 		Validator validator = null;
 		try {
 			validator = getClass().newInstance();
+			
+			if (com.jfinal.aop.AopManager.me().isInjectDependency()) {
+				com.jfinal.aop.Aop.inject(validator);
+			}
+			
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -496,9 +507,12 @@ public abstract class Validator implements Interceptor {
 	}
 	
 	private void validateStringValue(String value, int minLen, int maxLen, String errorKey, String errorMessage) {
-		if (StrKit.isBlank(value)) {
+		if (minLen > 0 && StrKit.isBlank(value)) {
 			addError(errorKey, errorMessage);
 			return ;
+		}
+		if (value == null) {		// 支持 minLen <= 0 且 value == null 的情况
+			value = "";
 		}
 		if (value.length() < minLen || value.length() > maxLen) {
 			addError(errorKey, errorMessage);

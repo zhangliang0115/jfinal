@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,6 +108,16 @@ public class Generator {
 		}
 	}
 	
+	/**
+	 * 配置是否生成字段备注，生成的备注会体现在 Base Model 之中
+	 * 默认值为 false
+	 */
+	public void setGenerateRemarks(boolean generateRemarks) {
+		if (metaBuilder != null) {
+			metaBuilder.setGenerateRemarks(generateRemarks);
+		}
+	}
+	
 	public void setTypeMapping(TypeMapping typeMapping) {
 		this.metaBuilder.setTypeMapping(typeMapping);
 	}
@@ -138,7 +148,16 @@ public class Generator {
 	}
 	
 	/**
-	 * 设置 BaseMode 是否生成链式 setter 方法
+	 * 设置用于生成 BaseModel 的模板文件，模板引擎将在 class path 与 jar 包内寻找模板文件
+	 * 
+	 * 默认模板为："/com/jfinal/plugin/activerecord/generator/base_model_template.jf"
+	 */
+	public void setBaseModelTemplate(String baseModelTemplate) {
+		baseModelGenerator.setTemplate(baseModelTemplate);
+	}
+	
+	/**
+	 * 设置 BaseModel 是否生成链式 setter 方法
 	 */
 	public void setGenerateChainSetter(boolean generateChainSetter) {
 		baseModelGenerator.setGenerateChainSetter(generateChainSetter);
@@ -160,6 +179,17 @@ public class Generator {
 	}
 	
 	/**
+	 * 设置用于生成 Model 的模板文件，模板引擎将在 class path 与 jar 包内寻找模板文件
+	 * 
+	 * 默认模板为："/com/jfinal/plugin/activerecord/generator/model_template.jf"
+	 */
+	public void setModelTemplate(String modelTemplate) {
+		if (modelGenerator != null) {
+			modelGenerator.setTemplate(modelTemplate);
+		}
+	}
+	
+	/**
 	 * 设置是否在 Model 中生成 dao 对象，默认生成
 	 */
 	public void setGenerateDaoInModel(boolean generateDaoInModel) {
@@ -173,6 +203,17 @@ public class Generator {
 	 */
 	public void setGenerateDataDictionary(boolean generateDataDictionary) {
 		this.generateDataDictionary = generateDataDictionary;
+	}
+	
+	/**
+	 * 设置用于生成 MappingKit 的模板文件，模板引擎将在 class path 与 jar 包内寻找模板文件
+	 * 
+	 * 默认模板为："/com/jfinal/plugin/activerecord/generator/mapping_kit_template.jf"
+	 */
+	public void setMappingKitTemplate(String mappingKitTemplate) {
+		if (this.mappingKitGenerator != null) {
+			this.mappingKitGenerator.setTemplate(mappingKitTemplate);
+		}
 	}
 	
 	/**

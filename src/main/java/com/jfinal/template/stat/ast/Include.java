@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,14 @@
 
 package com.jfinal.template.stat.ast;
 
-import java.io.Writer;
 import com.jfinal.template.EngineConfig;
 import com.jfinal.template.Env;
-import com.jfinal.template.FileStringSource;
 import com.jfinal.template.expr.ast.Assign;
 import com.jfinal.template.expr.ast.Const;
 import com.jfinal.template.expr.ast.Expr;
 import com.jfinal.template.expr.ast.ExprList;
+import com.jfinal.template.io.Writer;
+import com.jfinal.template.source.ISource;
 import com.jfinal.template.stat.Ctrl;
 import com.jfinal.template.stat.Location;
 import com.jfinal.template.stat.ParseException;
@@ -69,13 +69,13 @@ public class Include extends Stat {
 		Expr expr = exprList.getExpr(0);
 		if (expr instanceof Const && ((Const)expr).isStr()) {
 		} else {
-			throw new ParseException("The first parameter of #include directive must be String", location); 
+			throw new ParseException("The first parameter of #include directive must be String, or use the #render directive", location); 
 		}
 		// 其它参数必须为赋值表达式
 		if (len > 1) {
 			for (int i = 1; i < len; i++) {
 				if (!(exprList.getExpr(i) instanceof Assign)) {
-					throw new ParseException("The " + i + "th parameter of #include directive must be an assignment expression", location);
+					throw new ParseException("The " + (i + 1) + "th parameter of #include directive must be an assignment expression", location);
 				}
 			}
 		}
@@ -87,13 +87,14 @@ public class Include extends Stat {
 	private void parseSubTemplate(Env env, String fileName, String parentFileName, Location location) {
 		String subFileName = getSubFileName(fileName, parentFileName);
 		EngineConfig config = env.getEngineConfig();
-		FileStringSource fileStringSource = new FileStringSource(config.getBaseTemplatePath(), subFileName, config.getEncoding());
+		// FileSource fileSource = new FileSource(config.getBaseTemplatePath(), subFileName, config.getEncoding());
+		ISource fileSource = config.getSourceFactory().getSource(config.getBaseTemplatePath(), subFileName, config.getEncoding());
 		try {
-			Parser parser = new Parser(env, fileStringSource.getContent(), subFileName);
+			Parser parser = new Parser(env, fileSource.getContent(), subFileName);
 			if (config.isDevMode()) {
-				env.addStringSource(fileStringSource);
+				env.addSource(fileSource);
 			}
-			this.stat = parser.parse();
+			this.stat = parser.parse().getActualStat();
 		} catch (Exception e) {
 			// 文件路径不正确抛出异常时添加 location 信息
 			throw new ParseException(e.getMessage(), location, e);

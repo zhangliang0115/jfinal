@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import java.util.Map;
 import com.jfinal.kit.StrKit;
 import com.jfinal.plugin.activerecord.SqlPara;
 import com.jfinal.template.Engine;
-import com.jfinal.template.IStringSource;
 import com.jfinal.template.Template;
+import com.jfinal.template.source.ISource;
 
 /**
  * SqlKit
@@ -34,7 +34,7 @@ public class SqlKit {
 	
 	static final String SQL_TEMPLATE_MAP_KEY = "_SQL_TEMPLATE_MAP_";
 	static final String SQL_PARA_KEY = "_SQL_PARA_";
-	static final String PARA_ARRAY_KEY = "_PARA_ARRAY_";
+	static final String PARA_ARRAY_KEY = "_PARA_ARRAY_"; // 此参数保持不动，已被用于模板取值 _PARA_ARRAY_[n]
 	
 	private String configName;
 	private boolean devMode;
@@ -46,13 +46,14 @@ public class SqlKit {
 		this.configName = configName;
 		this.devMode = devMode;
 		
-		engine =  new Engine(configName);
+		engine = new Engine(configName);
 		engine.setDevMode(devMode);
+		engine.setToClassPathSourceFactory();
 		
-		engine.addDirective("namespace", new NameSpaceDirective());
-		engine.addDirective("sql", new SqlDirective());
-		engine.addDirective("para", new ParaDirective());
-		engine.addDirective("p", new ParaDirective());		// 配置 #para 指令的别名指令 #p，不建议使用，在此仅为兼容 3.0 版本
+		engine.addDirective("namespace", NameSpaceDirective.class);
+		engine.addDirective("sql", SqlDirective.class);
+		engine.addDirective("para", ParaDirective.class);
+		engine.addDirective("p", ParaDirective.class);		// 配置 #para 指令的别名指令 #p，不建议使用，在此仅为兼容 3.0 版本
 	}
 	
 	public SqlKit(String configName) {
@@ -79,7 +80,7 @@ public class SqlKit {
 		sqlSourceList.add(new SqlSource(sqlTemplate));
 	}
 	
-	public void addSqlTemplate(IStringSource sqlTemplate) {
+	public void addSqlTemplate(ISource sqlTemplate) {
 		if (sqlTemplate == null) {
 			throw new IllegalArgumentException("sqlTemplate can not be null");
 		}
@@ -87,9 +88,9 @@ public class SqlKit {
 	}
 	
 	public synchronized void parseSqlTemplate() {
-		Map<String, Template> sqlTemplateMap = new HashMap<String, Template>();
+		Map<String, Template> sqlTemplateMap = new HashMap<String, Template>(512, 0.5F);
 		for (SqlSource ss : sqlSourceList) {
-			Template template = ss.isFile() ? engine.getTemplate(ss.file) : engine.getTemplate(ss.stringSource);
+			Template template = ss.isFile() ? engine.getTemplate(ss.file) : engine.getTemplate(ss.source);
 			Map<Object, Object> data = new HashMap<Object, Object>();
 			data.put(SQL_TEMPLATE_MAP_KEY, sqlTemplateMap);
 			template.renderToString(data);
@@ -153,7 +154,7 @@ public class SqlKit {
 	 *	#end
 	 *
 	 * 2：java 代码
-	 * 	Kv cond = Kv.create("id", 123).set("age", 18);
+	 * 	Kv cond = Kv.by("id", 123).set("age", 18);
 	 * 	getSqlPara("key", cond);
 	 */
 	public SqlPara getSqlPara(String key, Map data) {
@@ -190,11 +191,62 @@ public class SqlKit {
 		data.put(SQL_PARA_KEY, sqlPara);
 		data.put(PARA_ARRAY_KEY, paras);
 		sqlPara.setSql(template.renderToString(data));
+		// data 为本方法中创建，不会污染用户数据，无需移除 SQL_PARA_KEY、PARA_ARRAY_KEY
 		return sqlPara;
+	}
+	
+	public java.util.Set<java.util.Map.Entry<String, Template>> getSqlMapEntrySet() {
+		return sqlTemplateMap.entrySet();
 	}
 	
 	public String toString() {
 		return "SqlKit for config : " + configName;
+	}
+	
+	// ---------
+	
+	/**
+	 * 通过 String 内容获取 SqlPara 对象
+	 * 
+	 * <pre>
+	 * 例子：
+	 *     String content = "select * from user where id = #para(id)";
+	 *     SqlPara sqlPara = getSqlParaByString(content, Kv.by("id", 123));
+	 * 
+	 * 特别注意：content 参数中不能包含 #sql 指令
+	 * </pre>
+	 */
+	public SqlPara getSqlParaByString(String content, Map data) {
+		Template template = engine.getTemplateByString(content);
+		
+		SqlPara sqlPara = new SqlPara();
+		data.put(SQL_PARA_KEY, sqlPara);
+		sqlPara.setSql(template.renderToString(data));
+		data.remove(SQL_PARA_KEY);	// 避免污染传入的 Map
+		return sqlPara;
+	}
+	
+	/**
+	 * 通过 String 内容获取 SqlPara 对象
+	 * 
+	 * <pre>
+	 * 例子：
+	 *     String content = "select * from user where id = #para(0)";
+	 *     SqlPara sqlPara = getSqlParaByString(content, 123);
+	 * 
+	 * 特别注意：content 参数中不能包含 #sql 指令
+	 * </pre>
+	 */
+	public SqlPara getSqlParaByString(String content, Object... paras) {
+		Template template = engine.getTemplateByString(content);
+		
+		SqlPara sqlPara = new SqlPara();
+		Map data = new HashMap();
+		data.put(SQL_PARA_KEY, sqlPara);
+		data.put(PARA_ARRAY_KEY, paras);
+		sqlPara.setSql(template.renderToString(data));
+		// data 为本方法中创建，不会污染用户数据，无需移除 SQL_PARA_KEY、PARA_ARRAY_KEY
+		return sqlPara;
 	}
 }
 

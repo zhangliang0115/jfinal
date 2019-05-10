@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -631,7 +631,8 @@ public class Cache {
 	public Long getCounter(Object key) {
 		Jedis jedis = getJedis();
 		try {
-			return Long.parseLong((String)jedis.get(keyNamingPolicy.getKeyName(key)));
+			String ret = (String)jedis.get(keyNamingPolicy.getKeyName(key));
+			return ret != null ? Long.parseLong(ret) : null;
 		}
 		finally {close(jedis);}
 	}
@@ -785,33 +786,21 @@ public class Cache {
 		}
 		finally {close(jedis);}
 	}
-	
+
 	/**
 	 * BLPOP 是列表的阻塞式(blocking)弹出原语。
 	 * 它是 LPOP 命令的阻塞版本，当给定列表内没有任何元素可供弹出的时候，连接将被 BLPOP 命令阻塞，直到等待超时或发现可弹出元素为止。
 	 * 当给定多个 key 参数时，按参数 key 的先后顺序依次检查各个列表，弹出第一个非空列表的头元素。
-	 */
-	@SuppressWarnings("rawtypes")
-	public List blpop(Object... keys) {
-		Jedis jedis = getJedis();
-		try {
-			List<byte[]> data = jedis.blpop(keysToBytesArray(keys));
-			return valueListFromBytesList(data);
-		}
-		finally {close(jedis);}
-	}
-	
-	/**
-	 * BLPOP 是列表的阻塞式(blocking)弹出原语。
-	 * 它是 LPOP 命令的阻塞版本，当给定列表内没有任何元素可供弹出的时候，连接将被 BLPOP 命令阻塞，直到等待超时或发现可弹出元素为止。
-	 * 当给定多个 key 参数时，按参数 key 的先后顺序依次检查各个列表，弹出第一个非空列表的头元素。
+	 * 
+	 * 参考：http://redisdoc.com/list/blpop.html
+	 * 命令行：BLPOP key [key ...] timeout
 	 */
 	@SuppressWarnings("rawtypes")
 	public List blpop(int timeout, Object... keys) {
 		Jedis jedis = getJedis();
 		try {
 			List<byte[]> data = jedis.blpop(timeout, keysToBytesArray(keys));
-			return valueListFromBytesList(data);
+			return keyValueListFromBytesList(data);
 		}
 		finally {close(jedis);}
 	}
@@ -821,29 +810,16 @@ public class Cache {
 	 * 它是 RPOP 命令的阻塞版本，当给定列表内没有任何元素可供弹出的时候，连接将被 BRPOP 命令阻塞，直到等待超时或发现可弹出元素为止。
 	 * 当给定多个 key 参数时，按参数 key 的先后顺序依次检查各个列表，弹出第一个非空列表的尾部元素。
 	 * 关于阻塞操作的更多信息，请查看 BLPOP 命令， BRPOP 除了弹出元素的位置和 BLPOP 不同之外，其他表现一致。
-	 */
-	@SuppressWarnings("rawtypes")
-	public List brpop(Object... keys) {
-		Jedis jedis = getJedis();
-		try {
-			List<byte[]> data = jedis.brpop(keysToBytesArray(keys));
-			return valueListFromBytesList(data);
-		}
-		finally {close(jedis);}
-	}
-	
-	/**
-	 * BRPOP 是列表的阻塞式(blocking)弹出原语。
-	 * 它是 RPOP 命令的阻塞版本，当给定列表内没有任何元素可供弹出的时候，连接将被 BRPOP 命令阻塞，直到等待超时或发现可弹出元素为止。
-	 * 当给定多个 key 参数时，按参数 key 的先后顺序依次检查各个列表，弹出第一个非空列表的尾部元素。
-	 * 关于阻塞操作的更多信息，请查看 BLPOP 命令， BRPOP 除了弹出元素的位置和 BLPOP 不同之外，其他表现一致。
+	 * 
+	 * 参考：http://redisdoc.com/list/brpop.html
+	 * 命令行：BRPOP key [key ...] timeout
 	 */
 	@SuppressWarnings("rawtypes")
 	public List brpop(int timeout, Object... keys) {
 		Jedis jedis = getJedis();
 		try {
 			List<byte[]> data = jedis.brpop(timeout, keysToBytesArray(keys));
-			return valueListFromBytesList(data);
+			return keyValueListFromBytesList(data);
 		}
 		finally {close(jedis);}
 	}
@@ -1172,11 +1148,37 @@ public class Cache {
 		finally {close(jedis);}
 	}
 	
+	/**
+	 * 删除当前 db 所有数据
+	 */
+	public String flushDB() {
+		Jedis jedis = getJedis();
+		try {
+			return jedis.flushDB();
+		}
+		finally {close(jedis);}
+	}
+	
+	/**
+	 * 删除所有 db 的所有数据
+	 */
+	public String flushAll() {
+		Jedis jedis = getJedis();
+		try {
+			return jedis.flushAll();
+		}
+		finally {close(jedis);}
+	}
+	
 	// ---------
 	
 	protected byte[] keyToBytes(Object key) {
 		String keyStr = keyNamingPolicy.getKeyName(key);
 		return serializer.keyToBytes(keyStr);
+	}
+
+	protected Object keyFromBytes(byte[] bytes) {
+		return serializer.keyFromBytes(bytes);
 	}
 	
 	protected byte[][] keysToBytesArray(Object... keys) {
@@ -1233,6 +1235,14 @@ public class Cache {
 		List<Object> result = new ArrayList<Object>();
 		for (byte[] d : data)
 			result.add(valueFromBytes(d));
+		return result;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	protected List keyValueListFromBytesList(List<byte[]> data) {
+		List<Object> result = new ArrayList<Object>();
+		result.add(keyFromBytes(data.get(0)));
+		result.add(valueFromBytes(data.get(1)));
 		return result;
 	}
 	

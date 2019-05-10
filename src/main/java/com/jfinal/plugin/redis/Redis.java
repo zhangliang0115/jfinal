@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ public class Redis {
 	
 	static Cache mainCache = null;
 	
-	private static final ConcurrentHashMap<String, Cache> cacheMap = new ConcurrentHashMap<String, Cache>();
+	private static final ConcurrentHashMap<String, Cache> cacheMap = new ConcurrentHashMap<String, Cache>(32, 0.5F);
 	
 	public static void addCache(Cache cache) {
 		if (cache == null)
@@ -72,15 +72,15 @@ public class Redis {
 		return cacheMap.get(cacheName);
 	}
 	
-	public static Object call(ICallback callback) {
+	public static <T> T call(ICallback callback) {
 		return call(callback, use());
 	}
 	
-	public static Object call(ICallback callback, String cacheName) {
+	public static <T> T call(ICallback callback, String cacheName) {
 		return call(callback, use(cacheName));
 	}
 	
-	private static Object call(ICallback callback, Cache cache) {
+	private static <T> T call(ICallback callback, Cache cache) {
 		Jedis jedis = cache.getThreadLocalJedis();
 		boolean notThreadLocalJedis = (jedis == null);
 		if (notThreadLocalJedis) {

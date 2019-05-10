@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,15 +29,14 @@ import net.sf.cglib.proxy.MethodProxy;
 public class Invocation {
 	
 	private Action action;
-	private static final Object[] NULL_ARGS = new Object[0];	// Prevent new Object[0] by jvm for paras of action invocation.
+	// private static final Object[] NULL_ARGS = new Object[0];	// Prevent new Object[0] by jvm for paras of action invocation.
 	
-	boolean useInjectTarget;
 	private Object target;
 	private Method method;
 	private Object[] args;
 	private MethodProxy methodProxy;
 	private Interceptor[] inters;
-	private Object returnValue = null;
+	private Object returnValue;
 	
 	private int index = 0;
 	
@@ -50,7 +49,9 @@ public class Invocation {
 		this.action = action;
 		this.inters = action.getInterceptors();
 		this.target = controller;
-		this.args = NULL_ARGS;
+		
+		// this.args = NULL_ARGS;
+		this.args = action.getParameterGetter().get(action, controller);
 	}
 	
 	public Invocation(Object target, Method method, Object[] args, MethodProxy methodProxy, Interceptor[] inters) {
@@ -76,15 +77,14 @@ public class Invocation {
 				else {
 					// if (!Modifier.isAbstract(method.getModifiers()))
 						// returnValue = methodProxy.invokeSuper(target, args);
-					if (useInjectTarget)
-						returnValue = methodProxy.invoke(target, args);
-					else
-						returnValue = methodProxy.invokeSuper(target, args);
+					
+					returnValue = methodProxy.invokeSuper(target, args);
 				}
 			}
 			catch (InvocationTargetException e) {
 				Throwable t = e.getTargetException();
-				throw t instanceof RuntimeException ? (RuntimeException)t : new RuntimeException(e);
+				if (t == null) {t = e;}
+				throw t instanceof RuntimeException ? (RuntimeException)t : new RuntimeException(t);
 			}
 			catch (RuntimeException e) {
 				throw e;

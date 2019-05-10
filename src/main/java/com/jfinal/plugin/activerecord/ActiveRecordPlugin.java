@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,13 +34,13 @@ import com.jfinal.plugin.activerecord.sql.SqlKit;
  */
 public class ActiveRecordPlugin implements IPlugin {
 	
-	private IDataSourceProvider dataSourceProvider = null;
-	private Boolean devMode = null;
+	protected IDataSourceProvider dataSourceProvider = null;
+	protected Boolean devMode = null;
 	
-	private Config config = null;
+	protected Config config = null;
 	
-	private boolean isStarted = false;
-	private List<Table> tableList = new ArrayList<Table>();
+	protected volatile boolean isStarted = false;
+	protected List<Table> tableList = new ArrayList<Table>();
 	
 	public ActiveRecordPlugin(String configName, DataSource dataSource, int transactionLevel) {
 		if (StrKit.isBlank(configName)) {
@@ -109,7 +109,7 @@ public class ActiveRecordPlugin implements IPlugin {
 		return this;
 	}
 	
-	public ActiveRecordPlugin addSqlTemplate(com.jfinal.template.IStringSource sqlTemplate) {
+	public ActiveRecordPlugin addSqlTemplate(com.jfinal.template.source.ISource sqlTemplate) {
 		config.sqlKit.addSqlTemplate(sqlTemplate);
 		return this;
 	}
@@ -176,6 +176,14 @@ public class ActiveRecordPlugin implements IPlugin {
 			throw new IllegalArgumentException("containerFactory can not be null");
 		}
 		config.containerFactory = containerFactory;
+		return this;
+	}
+	
+	public ActiveRecordPlugin setDbProFactory(IDbProFactory dbProFactory) {
+		if (dbProFactory == null) {
+			throw new IllegalArgumentException("dbProFactory can not be null");
+		}
+		config.dbProFactory = dbProFactory;
 		return this;
 	}
 	
@@ -287,6 +295,10 @@ public class ActiveRecordPlugin implements IPlugin {
 	 */
 	public static void useAsDataTransfer() {
 		useAsDataTransfer(new com.jfinal.plugin.activerecord.dialect.MysqlDialect(), IContainerFactory.defaultContainerFactory, new com.jfinal.plugin.activerecord.cache.EhCache());
+	}
+	
+	public Config getConfig() {
+		return config;
 	}
 }
 

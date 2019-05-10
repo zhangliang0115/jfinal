@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import static com.jfinal.aop.InterceptorManager.NULL_INTERS;
  */
 class Callback implements MethodInterceptor {
 	
-	private Object injectTarget = null;
 	private final Interceptor[] injectInters;
 	
 	private static final Set<String> excludedMethodName = buildExcludedMethodName();
@@ -40,15 +39,6 @@ class Callback implements MethodInterceptor {
 	
 	public Callback(Interceptor... injectInters) {
 		checkInjectInterceptors(injectInters);
-		this.injectInters = injectInters;
-	}
-	
-	public Callback(Object injectTarget, Interceptor... injectInters) {
-		if (injectTarget == null) {
-			throw new IllegalArgumentException("injectTarget can not be null.");
-		}
-		checkInjectInterceptors(injectInters);
-		this.injectTarget = injectTarget;
 		this.injectInters = injectInters;
 	}
 	
@@ -65,41 +55,22 @@ class Callback implements MethodInterceptor {
 	
 	public Object intercept(Object target, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
 		if (excludedMethodName.contains(method.getName())) {
-			// if (method.getName().equals("finalize"))
-			// 	return methodProxy.invokeSuper(target, args);
-			// return this.injectTarget != null ? methodProxy.invoke(this.injectTarget, args) : methodProxy.invokeSuper(target, args);
-			
-			// 保留上面注释部分，此处为优化
-			if (this.injectTarget == null || method.getName().equals("finalize")) {
-				return methodProxy.invokeSuper(target, args);
-			} else {
-				return methodProxy.invoke(this.injectTarget, args);
-			}
+			return methodProxy.invokeSuper(target, args);
 		}
 		
-		if (this.injectTarget != null) {
-			target = this.injectTarget;
-			Interceptor[] finalInters = interMan.buildServiceMethodInterceptor(injectInters, target.getClass(), method);
-			Invocation invocation = new Invocation(target, method, args, methodProxy, finalInters);
-			invocation.useInjectTarget = true;
-			invocation.invoke();
-			return invocation.getReturnValue();
+		Class<?> targetClass = target.getClass();
+		if (targetClass.getName().indexOf("$$EnhancerBy") != -1) {
+			targetClass = targetClass.getSuperclass();
 		}
-		else {
-			Class<?> targetClass = target.getClass();
-			if (targetClass.getName().indexOf("$$EnhancerByCGLIB") != -1) {
-				targetClass = targetClass.getSuperclass();
-			}
-			Interceptor[] finalInters = interMan.buildServiceMethodInterceptor(injectInters, targetClass, method);
-			Invocation invocation = new Invocation(target, method, args, methodProxy, finalInters);
-			invocation.useInjectTarget = false;
-			invocation.invoke();
-			return invocation.getReturnValue();
-		}
+		
+		Interceptor[] finalInters = interMan.buildServiceMethodInterceptor(injectInters, targetClass, method);
+		Invocation invocation = new Invocation(target, method, args, methodProxy, finalInters);
+		invocation.invoke();
+		return invocation.getReturnValue();
 	}
 	
 	private static final Set<String> buildExcludedMethodName() {
-		Set<String> excludedMethodName = new HashSet<String>();
+		Set<String> excludedMethodName = new HashSet<String>(64, 0.25F);
 		Method[] methods = Object.class.getDeclaredMethods();
 		for (Method m : methods) {
 			excludedMethodName.add(m.getName());

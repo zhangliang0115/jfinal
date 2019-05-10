@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@
 package com.jfinal.template.stat.ast;
 
 import java.io.IOException;
-import java.io.Writer;
 import com.jfinal.template.Env;
 import com.jfinal.template.TemplateException;
 import com.jfinal.template.expr.ast.ExprList;
+import com.jfinal.template.io.Writer;
 import com.jfinal.template.stat.Location;
 import com.jfinal.template.stat.Scope;
 
@@ -54,24 +54,11 @@ public abstract class Stat {
 	
 	protected void write(Writer writer, String str) {
 		try {
-			writer.write(str);
-		} catch (IOException e) {
-			throw new TemplateException(e.getMessage(), location, e);
-		}
-	}
-	
-	protected void write(Writer writer, char[] chars) {
-		try {
-			writer.write(chars);
+			writer.write(str, 0, str.length());
 		} catch (IOException e) {
 			throw new TemplateException(e.getMessage(), location, e);
 		}
 	}
 }
-
-
-
-
-
 
 

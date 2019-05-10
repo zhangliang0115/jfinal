@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,15 @@ import java.util.Set;
 
 /**
  * Cross Package Invoking pattern for package activerecord.
+ * 
+ * 为了避免开发者误用，Model、Db 中的部分方法没有完全开放出来，不能直接调用，
+ * 但可以通过 CPI 访问那些未完全开放的方法，对于扩展性开发十分有用
+ * 
+ * 例如：
+ *     Map attrMap = CPI.getAttrs(user);
+ *     以上代码可以获取到 User 这个 model 中的 attrs 属性
  */
+@SuppressWarnings({"unchecked", "rawtypes"})
 public abstract class CPI {
 	
 	/**
@@ -32,14 +40,24 @@ public abstract class CPI {
 	 * @param model the model extends from class Model
 	 * @return the attributes map of the model
 	 */
-	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static final Map<String, Object> getAttrs(Model model) {
-		return model.getAttrs();
+		return model._getAttrs();
 	}
 	
-	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static final Set<String> getModifyFlag(Model model) {
-		return model.getModifyFlag();
+		return model._getModifyFlag();
+	}
+	
+	public static final Table getTable(Model model) {
+		return model._getTable();
+	}
+	
+	public static final Config getConfig(Model model) {
+		return model._getConfig();
+	}
+	
+	public static final Class<? extends Model> getUsefulClass(Model model) {
+		return model._getUsefulClass();
 	}
 	
 	public static <T> List<T> query(Connection conn, String sql, Object... paras) throws SQLException {
@@ -57,6 +75,10 @@ public abstract class CPI {
 	public static final Map<String, Object> getColumns(Record record) {
 		return record.getColumns();
 	} */
+	
+	public static void setColumnsMap(Record record, Map<String, Object> columns) {
+		record.setColumnsMap(columns);
+	}
 	
 	public static List<Record> find(Connection conn, String sql, Object... paras) throws SQLException {
 		return Db.find(DbKit.config, conn, sql, paras);

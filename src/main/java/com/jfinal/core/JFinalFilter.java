@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,20 +43,35 @@ public class JFinalFilter implements Filter {
 	private static Log log;
 	private int contextPathLength;
 	
+	public JFinalFilter() {
+		this.jfinalConfig = null;
+	}
+	
+	/**
+	 * 支持 web 项目无需 web.xml 配置文件，便于嵌入式整合 jetty、undertow
+	 */
+	public JFinalFilter(JFinalConfig jfinalConfig) {
+		this.jfinalConfig = jfinalConfig;
+	}
+	
+	@SuppressWarnings("deprecation")
 	public void init(FilterConfig filterConfig) throws ServletException {
-		createJFinalConfig(filterConfig.getInitParameter("configClass"));
-		
-		if (jfinal.init(jfinalConfig, filterConfig.getServletContext()) == false) {
-			throw new RuntimeException("JFinal init error!");
+		if (jfinalConfig == null) {
+			createJFinalConfig(filterConfig.getInitParameter("configClass"));
 		}
 		
-		handler = jfinal.getHandler();
-		constants = Config.getConstants();
-		encoding = constants.getEncoding();
-		jfinalConfig.afterJFinalStart();
+		jfinal.init(jfinalConfig, filterConfig.getServletContext());
 		
 		String contextPath = filterConfig.getServletContext().getContextPath();
 		contextPathLength = (contextPath == null || "/".equals(contextPath) ? 0 : contextPath.length());
+		
+		constants = Config.getConstants();
+		encoding = constants.getEncoding();
+		
+		jfinalConfig.onStart();
+		jfinalConfig.afterJFinalStart();
+		
+		handler = jfinal.getHandler();		// 开始接受请求
 	}
 	
 	public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
@@ -85,27 +100,26 @@ public class JFinalFilter implements Filter {
 		}
 	}
 	
+	@SuppressWarnings("deprecation")
 	public void destroy() {
+		handler = null;		// 停止接受请求
+		
+		jfinalConfig.onStop();
 		jfinalConfig.beforeJFinalStop();
+		
 		jfinal.stopPlugins();
 	}
 	
-	private void createJFinalConfig(String configClass) {
+	protected void createJFinalConfig(String configClass) {
 		if (configClass == null) {
-			throw new RuntimeException("Please set configClass parameter of JFinalFilter in web.xml");
+			throw new RuntimeException("The configClass parameter of JFinalFilter can not be blank");
 		}
 		
-		Object temp = null;
 		try {
-			temp = Class.forName(configClass).newInstance();
-		} catch (Exception e) {
-			throw new RuntimeException("Can not create instance of class: " + configClass, e);
-		}
-		
-		if (temp instanceof JFinalConfig) {
+			Object temp = Class.forName(configClass).newInstance();
 			jfinalConfig = (JFinalConfig)temp;
-		} else {
-			throw new RuntimeException("Can not create instance of class: " + configClass + ". Please check the config in web.xml");
+		} catch (ReflectiveOperationException e) {
+			throw new RuntimeException("Can not create instance of class: " + configClass, e);
 		}
 	}
 	

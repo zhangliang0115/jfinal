@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -329,7 +329,7 @@ class ExprLexer {
 				radix = 16;						// 16 进制
 				c = next();
 				numStart = numStart + 2;
-			} else {
+			} else if (c != '.') {
 				radix = 8;						// 8 进制
 				// numStart = numStart + 1;		// 8 进制不用去掉前缀 0，可被正确转换，去除此行便于正确处理数字 0
 			}
@@ -339,10 +339,11 @@ class ExprLexer {
 		Sym sym = null;
 		if (c == '.') {							// 以 '.' 字符结尾是合法的浮点数
 			next();
-			if (peek() == '.') {				// 处理 [0..9] 这样的表达式
+			if (peek() == '.' ||				// 处理 [0..9] 这样的表达式
+				CharTable.isLetter(peek())) {	// 处理 123.toInt() 这样的表达式，1.2.toInt() 及 1D.toInt() 可正常处理
 				StringBuilder n = subBuf(numStart, forward - 2);
 				if (n == null /* && radix == 16 */) {
-					// 16 进制数格式错误，前缀 0x 后缺少 16 进制数字
+					// 16 进制数格式错误，前缀 0x 后缺少 16 进制数字(16 进制时 numStart 已增加了 2， n 为 null 必是 16 进制解析出错)
 					throw new ParseException("Error hex format", location);
 				}
 				NumTok tok = new NumTok(Sym.INT, n.toString(), radix, false, location);

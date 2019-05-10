@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ public class C3p0Plugin implements IPlugin, IDataSourceProvider {
 	private int acquireIncrement = 2;
 	
 	private ComboPooledDataSource dataSource;
-	private boolean isStarted = false;
+	private volatile boolean isStarted = false;
 	
 	public C3p0Plugin setDriverClass(String driverClass) {
 		if (StrKit.isBlank(driverClass))

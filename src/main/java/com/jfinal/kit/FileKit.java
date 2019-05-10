@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,11 +29,29 @@ public class FileKit {
 			}
 			else if (file.isDirectory()) {
 				File files[] = file.listFiles();
-				for (int i=0; i<files.length; i++) {
-					delete(files[i]);
+				if (files != null) {
+					for (int i=0; i<files.length; i++) {
+						delete(files[i]);
+					}
 				}
+				file.delete();
 			}
-			file.delete();
 		}
 	}
+	
+	public static String getFileExtension(String fileFullName) {
+	    if (StrKit.isBlank(fileFullName)) {
+            throw new RuntimeException("fileFullName is empty");
+        }
+	    return  getFileExtension(new File(fileFullName));
+	}
+	
+	public static String getFileExtension(File file) {
+	    if (null == file) {
+	        throw new NullPointerException();
+	    }
+	    String fileName = file.getName();
+	    int dotIdx = fileName.lastIndexOf('.');
+	    return (dotIdx == -1) ? "" : fileName.substring(dotIdx + 1);
+    }
 }

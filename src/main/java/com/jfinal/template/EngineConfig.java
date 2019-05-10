@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,65 +22,80 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import com.jfinal.core.Const;
 import com.jfinal.kit.StrKit;
 import com.jfinal.template.expr.ast.ExprList;
 import com.jfinal.template.expr.ast.SharedMethodKit;
 import com.jfinal.template.ext.directive.*;
-import com.jfinal.template.ext.sharedmethod.Json;
+import com.jfinal.template.ext.sharedmethod.SharedMethodLib;
+import com.jfinal.template.io.EncoderFactory;
+import com.jfinal.template.io.WriterBuffer;
+import com.jfinal.template.source.FileSource;
+import com.jfinal.template.source.FileSourceFactory;
+import com.jfinal.template.source.ISource;
+import com.jfinal.template.source.ISourceFactory;
+import com.jfinal.template.source.StringSource;
 import com.jfinal.template.stat.Location;
+import com.jfinal.template.stat.OutputDirectiveFactory;
 import com.jfinal.template.stat.Parser;
 import com.jfinal.template.stat.ast.Define;
 import com.jfinal.template.stat.ast.Output;
-import com.jfinal.template.stat.ast.Stat;
 
 /**
  * EngineConfig
  */
 public class EngineConfig {
 	
-	private Map<String, Define> sharedFunctionMap = new HashMap<String, Define>();
-	private List<IStringSource> sharedFunctionSourceList = new ArrayList<IStringSource>();		// for devMode only
+	public static final String DEFAULT_ENCODING = "UTF-8";
+	
+	WriterBuffer writerBuffer = new WriterBuffer();
+	
+	private Map<String, Define> sharedFunctionMap = createSharedFunctionMap();		// new HashMap<String, Define>(512, 0.25F);
+	private List<ISource> sharedFunctionSourceList = new ArrayList<ISource>();		// for devMode only
 	
 	Map<String, Object> sharedObjectMap = null;
 	
-	private IOutputDirectiveFactory outputDirectiveFactory = OutputDirectiveFactory.me;
-	private Map<String, Stat> directiveMap = new HashMap<String, Stat>();
+	private OutputDirectiveFactory outputDirectiveFactory = OutputDirectiveFactory.me;
+	private ISourceFactory sourceFactory = new FileSourceFactory();
+	private Map<String, Class<? extends Directive>> directiveMap = new HashMap<String, Class<? extends Directive>>(64, 0.5F);
 	private SharedMethodKit sharedMethodKit = new SharedMethodKit();
 	
 	private boolean devMode = false;
 	private boolean reloadModifiedSharedFunctionInDevMode = true;
 	private String baseTemplatePath = null;
-	private String encoding = Const.DEFAULT_ENCODING;
+	private String encoding = DEFAULT_ENCODING;
 	private String datePattern = "yyyy-MM-dd HH:mm";
 	
 	public EngineConfig() {
 		// Add official directive of Template Engine
-		addDirective("render", new RenderDirective());
-		addDirective("date", new DateDirective());
-		addDirective("escape", new EscapeDirective());
-		addDirective("string", new StringDirective());
-		addDirective("random", new RandomDirective());
+		addDirective("render", RenderDirective.class);
+		addDirective("date", DateDirective.class);
+		addDirective("escape", EscapeDirective.class);
+		addDirective("string", StringDirective.class);
+		addDirective("random", RandomDirective.class);
+		addDirective("number", NumberDirective.class);
+		addDirective("call", CallDirective.class);
 		
 		// Add official shared method of Template Engine
-		addSharedMethod(new Json());
+		addSharedMethod(new SharedMethodLib());
 	}
 	
 	/**
 	 * Add shared function with file
 	 */
 	public void addSharedFunction(String fileName) {
-		FileStringSource fileStringSource = new FileStringSource(baseTemplatePath, fileName, encoding);
-		doAddSharedFunction(fileStringSource, fileName);
+		fileName = fileName.replace("\\", "/");
+		// FileSource fileSource = new FileSource(baseTemplatePath, fileName, encoding);
+		ISource source = sourceFactory.getSource(baseTemplatePath, fileName, encoding);
+		doAddSharedFunction(source, fileName);
 	}
 	
-	private synchronized void doAddSharedFunction(IStringSource stringSource, String fileName) {
+	private synchronized void doAddSharedFunction(ISource source, String fileName) {
 		Env env = new Env(this);
-		new Parser(env, stringSource.getContent(), fileName).parse();
+		new Parser(env, source.getContent(), fileName).parse();
 		addToSharedFunctionMap(sharedFunctionMap, env);
 		if (devMode) {
-			sharedFunctionSourceList.add(stringSource);
-			env.addStringSource(stringSource);
+			sharedFunctionSourceList.add(source);
+			env.addSource(source);
 		}
 	}
 	
@@ -97,16 +112,18 @@ public class EngineConfig {
 	 * Add shared function by string content
 	 */
 	public void addSharedFunctionByString(String content) {
-		MemoryStringSource memoryStringSource = new MemoryStringSource(content);
-		doAddSharedFunction(memoryStringSource, null);
+		// content 中的内容被解析后会存放在 Env 之中，而 StringSource 所对应的
+		// Template 对象 isModified() 始终返回 false，所以没有必要对其缓存
+		StringSource stringSource = new StringSource(content, false);
+		doAddSharedFunction(stringSource, null);
 	}
 	
 	/**
-	 * Add shared function by IStringSource
+	 * Add shared function by ISource
 	 */
-	public void addSharedFunction(IStringSource stringSource) {
-		String fileName = stringSource instanceof FileStringSource ? ((FileStringSource)stringSource).getFileName() : null;
-		doAddSharedFunction(stringSource, fileName);
+	public void addSharedFunction(ISource source) {
+		String fileName = source instanceof FileSource ? ((FileSource)source).getFileName() : null;
+		doAddSharedFunction(source, fileName);
 	}
 	
 	private void addToSharedFunctionMap(Map<String, Define> sharedFunctionMap, Env env) {
@@ -164,24 +181,28 @@ public class EngineConfig {
 	 * 开发者可直接使用模板注释功能将不需要的 function 直接注释掉
 	 */
 	private synchronized void reloadSharedFunctionSourceList() {
-		Map<String, Define> newMap = new HashMap<String, Define>();
+		Map<String, Define> newMap = createSharedFunctionMap();
 		for (int i = 0, size = sharedFunctionSourceList.size(); i < size; i++) {
-			IStringSource ss = sharedFunctionSourceList.get(i);
-			String fileName = ss instanceof FileStringSource ? ((FileStringSource)ss).getFileName() : null;
+			ISource source = sharedFunctionSourceList.get(i);
+			String fileName = source instanceof FileSource ? ((FileSource)source).getFileName() : null;
 			
 			Env env = new Env(this);
-			new Parser(env, ss.getContent(), fileName).parse();
+			new Parser(env, source.getContent(), fileName).parse();
 			addToSharedFunctionMap(newMap, env);
 			if (devMode) {
-				env.addStringSource(ss);
+				env.addSource(source);
 			}
 		}
 		this.sharedFunctionMap = newMap;
 	}
 	
+	private Map<String, Define> createSharedFunctionMap() {
+		return new HashMap<String, Define>(512, 0.25F);
+	}
+	
 	public synchronized void addSharedObject(String name, Object object) {
 		if (sharedObjectMap == null) {
-			sharedObjectMap = new HashMap<String, Object>();
+			sharedObjectMap = new HashMap<String, Object>(64, 0.25F);
 		} else if (sharedObjectMap.containsKey(name)) {
 			throw new IllegalArgumentException("Shared object already exists: " + name);
 		}
@@ -195,7 +216,7 @@ public class EngineConfig {
 	/**
 	 * Set output directive factory
 	 */
-	public void setOutputDirectiveFactory(IOutputDirectiveFactory outputDirectiveFactory) {
+	public void setOutputDirectiveFactory(OutputDirectiveFactory outputDirectiveFactory) {
 		if (outputDirectiveFactory == null) {
 			throw new IllegalArgumentException("outputDirectiveFactory can not be null");
 		}
@@ -217,13 +238,33 @@ public class EngineConfig {
 		return devMode;
 	}
 	
+	/**
+	 * Invoked by Engine only
+	 */
+	void setSourceFactory(ISourceFactory sourceFactory) {
+		if (sourceFactory == null) {
+			throw new IllegalArgumentException("sourceFactory can not be null");
+		}
+		this.sourceFactory = sourceFactory;
+	}
+	
+	public ISourceFactory getSourceFactory() {
+		return sourceFactory;
+	}
+	
 	public void setBaseTemplatePath(String baseTemplatePath) {
+		// 使用 ClassPathSourceFactory 时，允许 baseTemplatePath 为 null 值
+		if (baseTemplatePath == null) {
+			this.baseTemplatePath = null;
+			return ;
+		}
 		if (StrKit.isBlank(baseTemplatePath)) {
 			throw new IllegalArgumentException("baseTemplatePath can not be blank");
 		}
 		baseTemplatePath = baseTemplatePath.trim();
+		baseTemplatePath = baseTemplatePath.replace("\\", "/");
 		if (baseTemplatePath.length() > 1) {
-			if (baseTemplatePath.endsWith("/") || baseTemplatePath.endsWith("\\")) {
+			if (baseTemplatePath.endsWith("/")) {
 				baseTemplatePath = baseTemplatePath.substring(0, baseTemplatePath.length() - 1);
 			}
 		}
@@ -239,6 +280,17 @@ public class EngineConfig {
 			throw new IllegalArgumentException("encoding can not be blank");
 		}
 		this.encoding = encoding;
+		
+		writerBuffer.setEncoding(encoding);		// 间接设置 EncoderFactory.encoding
+	}
+	
+	public void setEncoderFactory(EncoderFactory encoderFactory) {
+		writerBuffer.setEncoderFactory(encoderFactory);
+		writerBuffer.setEncoding(encoding);		// 间接设置 EncoderFactory.encoding
+	}
+	
+	public void setWriterBufferSize(int bufferSize) {
+		writerBuffer.setBufferSize(bufferSize);
 	}
 	
 	public String getEncoding() {
@@ -260,20 +312,25 @@ public class EngineConfig {
 		this.reloadModifiedSharedFunctionInDevMode = reloadModifiedSharedFunctionInDevMode;
 	}
 	
-	public synchronized void addDirective(String directiveName, Directive directive) {
+	@Deprecated
+	public void addDirective(String directiveName, Directive directive) {
+		addDirective(directiveName, directive.getClass());
+	}
+	
+	public synchronized void addDirective(String directiveName, Class<? extends Directive> directiveClass) {
 		if (StrKit.isBlank(directiveName)) {
 			throw new IllegalArgumentException("directive name can not be blank");
 		}
-		if (directive == null) {
-			throw new IllegalArgumentException("directive can not be null");
+		if (directiveClass == null) {
+			throw new IllegalArgumentException("directiveClass can not be null");
 		}
 		if (directiveMap.containsKey(directiveName)) {
 			throw new IllegalArgumentException("directive already exists : " + directiveName);
 		}
-		directiveMap.put(directiveName, directive);
+		directiveMap.put(directiveName, directiveClass);
 	}
 	
-	public Stat getDirective(String directiveName) {
+	public Class<? extends Directive> getDirective(String directiveName) {
 		return directiveMap.get(directiveName);
 	}
 	
@@ -289,10 +346,17 @@ public class EngineConfig {
 	}
 	
 	/**
+	 * Add shared method from class
+	 */
+	public void addSharedMethod(Class<?> sharedMethodFromClass) {
+		sharedMethodKit.addSharedMethod(sharedMethodFromClass);
+	}
+	
+	/**
 	 * Add shared static method of Class
 	 */
-	public void addSharedStaticMethod(Class<?> sharedClass) {
-		sharedMethodKit.addSharedStaticMethod(sharedClass);
+	public void addSharedStaticMethod(Class<?> sharedStaticMethodFromClass) {
+		sharedMethodKit.addSharedStaticMethod(sharedStaticMethodFromClass);
 	}
 	
 	/**

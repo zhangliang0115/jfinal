@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,22 @@ public class PropKit {
 	private PropKit() {}
 	
 	/**
-	 * Using the properties file. It will loading the properties file if not loading.
+	 * Use the first found properties file
+	 */
+	public static Prop useFirstFound(String... fileNames) {
+		for (String fn : fileNames) {
+			try {
+				return use(fn, Const.DEFAULT_ENCODING);
+			} catch (Exception e) {
+				continue ;
+			}
+		}
+		
+		throw new IllegalArgumentException("没有配置文件可被使用");
+	}
+	
+	/**
+	 * Use the properties file. It will loading the properties file if not loading.
 	 * @see #use(String, String)
 	 */
 	public static Prop use(String fileName) {
@@ -39,7 +54,7 @@ public class PropKit {
 	}
 	
 	/**
-	 * Using the properties file. It will loading the properties file if not loading.
+	 * Use the properties file. It will loading the properties file if not loading.
 	 * <p>
 	 * Example:<br>
 	 * PropKit.use("config.txt", "UTF-8");<br>
@@ -58,17 +73,22 @@ public class PropKit {
 	public static Prop use(String fileName, String encoding) {
 		Prop result = map.get(fileName);
 		if (result == null) {
-			result = new Prop(fileName, encoding);
-			map.put(fileName, result);
-			if (PropKit.prop == null) {
-				PropKit.prop = result;
+			synchronized (PropKit.class) {
+				result = map.get(fileName);
+				if (result == null) {
+					result = new Prop(fileName, encoding);
+					map.put(fileName, result);
+					if (PropKit.prop == null) {
+						PropKit.prop = result;
+					}
+				}
 			}
 		}
 		return result;
 	}
 	
 	/**
-	 * Using the properties file bye File object. It will loading the properties file if not loading.
+	 * Use the properties file bye File object. It will loading the properties file if not loading.
 	 * @see #use(File, String)
 	 */
 	public static Prop use(File file) {
@@ -76,7 +96,7 @@ public class PropKit {
 	}
 	
 	/**
-	 * Using the properties file bye File object. It will loading the properties file if not loading.
+	 * Use the properties file bye File object. It will loading the properties file if not loading.
 	 * <p>
 	 * Example:<br>
 	 * PropKit.use(new File("/var/config/my_config.txt"), "UTF-8");<br>
@@ -88,10 +108,15 @@ public class PropKit {
 	public static Prop use(File file, String encoding) {
 		Prop result = map.get(file.getName());
 		if (result == null) {
-			result = new Prop(file, encoding);
-			map.put(file.getName(), result);
-			if (PropKit.prop == null) {
-				PropKit.prop = result;
+			synchronized (PropKit.class) {
+				result = map.get(file.getName());
+				if (result == null) {
+					result = new Prop(file, encoding);
+					map.put(file.getName(), result);
+					if (PropKit.prop == null) {
+						PropKit.prop = result;
+					}
+				}
 			}
 		}
 		return result;
@@ -108,6 +133,56 @@ public class PropKit {
 	public static void clear() {
 		prop = null;
 		map.clear();
+	}
+	
+	public static Prop append(Prop prop) {
+		synchronized (PropKit.class) {
+			if (PropKit.prop != null) {
+				PropKit.prop.append(prop);
+			} else {
+				PropKit.prop = prop;
+			}
+			return PropKit.prop;
+		}
+	}
+	
+	public static Prop append(String fileName, String encoding) {
+		return append(new Prop(fileName, encoding));
+	}
+	
+	public static Prop append(String fileName) {
+		return append(fileName, Const.DEFAULT_ENCODING);
+	}
+	
+	public static Prop appendIfExists(String fileName, String encoding) {
+		try {
+			return append(new Prop(fileName, encoding));
+		} catch (Exception e) {
+			return PropKit.prop;
+		}
+	}
+	
+	public static Prop appendIfExists(String fileName) {
+		return appendIfExists(fileName, Const.DEFAULT_ENCODING);
+	}
+	
+	public static Prop append(File file, String encoding) {
+		return append(new Prop(file, encoding));
+	}
+	
+	public static Prop append(File file) {
+		return append(file, Const.DEFAULT_ENCODING);
+	}
+	
+	public static Prop appendIfExists(File file, String encoding) {
+		if (file.exists()) {
+			append(new Prop(file, encoding));
+		}
+		return PropKit.prop;
+	}
+	
+	public static Prop appendIfExists(File file) {
+		return appendIfExists(file, Const.DEFAULT_ENCODING);
 	}
 	
 	public static Prop getProp() {

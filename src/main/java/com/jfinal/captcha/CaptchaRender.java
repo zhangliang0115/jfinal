@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2017, James Zhan 詹波 (jfinal@126.com).
+ * Copyright (c) 2011-2019, James Zhan 詹波 (jfinal@126.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import com.jfinal.render.RenderException;
 public class CaptchaRender extends Render {
 	
 	protected static String captchaName = "_jfinal_captcha";
-	protected static Random random = new Random(System.nanoTime());
+	protected static final Random random = new Random(System.nanoTime());
 	
 	// 默认的验证码大小
 	protected static final int WIDTH = 108, HEIGHT = 40;
@@ -48,13 +48,20 @@ public class CaptchaRender extends Render {
 	protected static final char[] charArray = "3456789ABCDEFGHJKMNPQRSTUVWXY".toCharArray();
 	// 验证码字体
 	protected static final Font[] RANDOM_FONT = new Font[] {
+		new Font(Font.DIALOG, Font.BOLD, 33),
+		new Font(Font.DIALOG_INPUT, Font.BOLD, 34),
+		new Font(Font.SERIF, Font.BOLD, 33),
+		new Font(Font.SANS_SERIF, Font.BOLD, 34),
+		new Font(Font.MONOSPACED, Font.BOLD, 34)
+	};
+	/*protected static final Font[] RANDOM_FONT = new Font[] {
 		new Font("nyala", Font.BOLD, 38),
 		new Font("Arial", Font.BOLD, 32),
 		new Font("Bell MT", Font.BOLD, 32),
 		new Font("Credit valley", Font.BOLD, 34),
 		new Font("Impact", Font.BOLD, 32),
 		new Font(Font.MONOSPACED, Font.BOLD, 40)
-	};
+	};*/
 	
 	/**
 	 * 设置 captchaName
